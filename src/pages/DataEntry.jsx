@@ -1,4 +1,7 @@
 import React, { useState } from "react";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../lib/firebase";
+import { useAuth } from "../context/AuthContext";
 import Icon from "../components/Icon";
 
 const RIBBON_OPTIONS = [
@@ -59,24 +62,45 @@ function HandMeasurementCard({ title, icon, accentClass, values, onChange }) {
   );
 }
 
+const EMPTY_FORM = {
+  lotNumber: "",
+  numHands: "",
+  ribbon: "",
+  subBasal: { grade: "", length: "", fingers: "" },
+  apical: { grade: "", length: "", fingers: "" },
+};
+
 export default function DataEntry() {
-  const [saveState, setSaveState] = useState("idle"); // idle | saving | saved
+  const { user } = useAuth();
+  const [saveState, setSaveState] = useState("idle"); // idle | saving | saved | error
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const [form, setForm] = useState({
-    lotNumber: "",
-    numHands: "",
-    ribbon: "",
-    subBasal: { grade: "", length: "", fingers: "" },
-    apical: { grade: "", length: "", fingers: "" },
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMsg("");
     setSaveState("saving");
-    setTimeout(() => {
+
+    try {
+      await addDoc(collection(db, "profiles"), {
+        lotNumber: form.lotNumber,
+        numHands: form.numHands,
+        ribbon: form.ribbon,
+        subBasal: form.subBasal,
+        apical: form.apical,
+        createdBy: user?.uid ?? null,
+        createdAt: serverTimestamp(),
+      });
+
       setSaveState("saved");
+      setForm(EMPTY_FORM);
       setTimeout(() => setSaveState("idle"), 2000);
-    }, 1000);
+    } catch (err) {
+      console.error("Error guardando el perfil:", err);
+      setErrorMsg("No se pudo guardar el perfil. Intenta de nuevo.");
+      setSaveState("error");
+    }
   };
 
   const saveButtonContent = () => {
@@ -93,6 +117,14 @@ export default function DataEntry() {
         <>
           <Icon name="check_circle" />
           Profile Saved
+        </>
+      );
+    }
+    if (saveState === "error") {
+      return (
+        <>
+          <Icon name="error" />
+          Retry Save
         </>
       );
     }
@@ -198,11 +230,16 @@ export default function DataEntry() {
             type="submit"
             disabled={saveState === "saving"}
             className={`w-full md:w-auto md:px-12 h-12 font-semibold text-sm rounded-full shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-white ${
-              saveState === "saved" ? "bg-green-700" : "bg-[#00450d] hover:bg-[#1b5e20]"
+              saveState === "saved"
+                ? "bg-green-700"
+                : saveState === "error"
+                ? "bg-[#ba1a1a] hover:bg-[#93000a]"
+                : "bg-[#00450d] hover:bg-[#1b5e20]"
             }`}
           >
             {saveButtonContent()}
           </button>
+          {errorMsg && <p className="text-sm text-[#ba1a1a] mt-2">{errorMsg}</p>}
         </div>
       </form>
 

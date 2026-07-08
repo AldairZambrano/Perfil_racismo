@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { db } from "../lib/firebase";
 import Icon from "../components/Icon";
 
 const RIBBON_META = {
@@ -41,14 +43,6 @@ const RIBBON_META = {
   },
 };
 
-const INITIAL_ENTRIES = [
-  { id: "#0882", ribbon: "Red", time: "09:12 AM" },
-  { id: "#0883", ribbon: "Yellow", time: "09:45 AM" },
-  { id: "#0884", ribbon: "Green", time: "10:15 AM" },
-  { id: "#0885", ribbon: "Blue", time: "11:30 AM" },
-  { id: "#0886", ribbon: "Green", time: "12:05 PM" },
-];
-
 function SummaryCard({ label, value, valueClass = "text-[#00450d]", big = true }) {
   return (
     <div className="bg-white border border-[#c0c9bb] p-6 rounded-xl flex flex-col gap-2">
@@ -60,8 +54,18 @@ function SummaryCard({ label, value, valueClass = "text-[#00450d]", big = true }
   );
 }
 
+const DEFAULT_META = {
+  dot: "bg-[#755750]",
+  ring: "ring-[#ffdad2]",
+  bar: "bg-[#755750]",
+  badgeBg: "bg-[#ffd7ce]",
+  badgeText: "text-[#7a5b54]",
+  label: "Registered",
+  priorityText: "text-[#755750]",
+};
+
 function HistoryRow({ entry, onEdit }) {
-  const meta = RIBBON_META[entry.ribbon];
+  const meta = RIBBON_META[entry.ribbon] || DEFAULT_META;
 
   return (
     <div
@@ -71,7 +75,7 @@ function HistoryRow({ entry, onEdit }) {
       <div className={`absolute left-0 top-0 w-1 h-full ${meta.bar}`}></div>
       <div className="grid grid-cols-4 md:grid-cols-12 items-center px-4 md:px-6 py-4 min-h-[56px]">
         <div className="col-span-2 md:col-span-2">
-          <span className="text-lg md:text-base text-[#1a1c1c]">{entry.id}</span>
+          <span className="text-lg md:text-base text-[#1a1c1c]">{entry.lotNumber}</span>
           <p className="md:hidden text-xs text-[#41493e]">Lot Number</p>
         </div>
 
@@ -111,9 +115,45 @@ function HistoryRow({ entry, onEdit }) {
   );
 }
 
+function formatTime(timestamp) {
+  if (!timestamp?.toDate) return "—";
+  return timestamp.toDate().toLocaleTimeString("es-CO", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function DailyHistory() {
-  const [entries] = useState(INITIAL_ENTRIES);
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const q = query(collection(db, "profiles"), orderBy("createdAt", "desc"));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const docs = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            lotNumber: data.lotNumber || "—",
+            ribbon: data.ribbon || "Green",
+            time: formatTime(data.createdAt),
+          };
+        });
+        setEntries(docs);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Error leyendo perfiles:", err);
+        setLoading(false);
+      }
+    );
+
+    return unsubscribe;
+  }, []);
 
   const handleEdit = (entry) => {
     // Navega a Data Entry para editar este registro
@@ -145,7 +185,7 @@ export default function DailyHistory() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <SummaryCard label="Total Profiles" value={124} />
+        <SummaryCard label="Total Profiles" value={entries.length} />
         <SummaryCard label="Active Zone" value="Zone A" big={false} />
         <SummaryCard label="Efficiency" value="98%" valueClass="text-[#2a6b2c]" />
         <SummaryCard label="Last Sync" value="14:05 PM" valueClass="text-[#1a1c1c]" big={false} />
@@ -163,20 +203,30 @@ export default function DailyHistory() {
           <div className="col-span-1 text-right">Action</div>
         </div>
         <div className="divide-y divide-[#c0c9bb]">
+          {loading && (
+            <p className="text-center text-sm text-[#41493e] py-10">Cargando registros...</p>
+          )}
+          {!loading && entries.length === 0 && (
+            <p className="text-center text-sm text-[#41493e] py-10">
+              Aún no hay perfiles registrados. Crea uno desde "Data Entry".
+            </p>
+          )}
           {entries.map((entry) => (
             <HistoryRow key={entry.id} entry={entry} onEdit={handleEdit} />
           ))}
         </div>
       </div>
 
-      <div className="mt-8 flex justify-center">
-        <button
-          onClick={handleLoadMore}
-          className="bg-[#eeeeee] text-[#41493e] border border-[#c0c9bb] px-8 py-3 rounded-full text-sm font-semibold hover:bg-[#e8e8e8] transition-colors active:scale-95"
-        >
-          Load Older Entries
-        </button>
-      </div>
+      {entries.length > 0 && (
+        <div className="mt-8 flex justify-center">
+          <button
+            onClick={handleLoadMore}
+            className="bg-[#eeeeee] text-[#41493e] border border-[#c0c9bb] px-8 py-3 rounded-full text-sm font-semibold hover:bg-[#e8e8e8] transition-colors active:scale-95"
+          >
+            Load Older Entries
+          </button>
+        </div>
+      )}
     </>
   );
 }
