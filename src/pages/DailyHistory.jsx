@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, orderBy, where, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import { useAuth } from "../context/AuthContext";
 import Icon from "../components/Icon";
 
 const RIBBON_META = {
@@ -127,9 +128,16 @@ export default function DailyHistory() {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
-    const q = query(collection(db, "profiles"), orderBy("createdAt", "desc"));
+    if (!user) return;
+
+    const q = query(
+      collection(db, "profiles"),
+      where("createdBy", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
 
     const unsubscribe = onSnapshot(
       q,
@@ -153,7 +161,7 @@ export default function DailyHistory() {
     );
 
     return unsubscribe;
-  }, []);
+  }, [user]);
 
   const handleEdit = (entry) => {
     // Navega a Data Entry para editar este registro
