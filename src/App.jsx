@@ -4,6 +4,7 @@ import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
+import VerifyEmail from "./pages/VerifyEmail";
 import DataEntry from "./pages/DataEntry";
 import DailyHistory from "./pages/DailyHistory";
 import AveragesDashboard from "./pages/AveragesDashboard";
@@ -14,6 +15,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route element={<Login />} path="/login" />
+          <Route element={<VerifyEmail />} path="/verify-email" />
 
           <Route
             element={

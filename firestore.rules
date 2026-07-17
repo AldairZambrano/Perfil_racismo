@@ -6,10 +6,13 @@ service cloud.firestore {
     // Perfiles de racimos: solo usuarios autenticados pueden leer y escribir.
     match /profiles/{profileId} {
       allow read: if request.auth != null
+                    && request.auth.token.email_verified == true
                     && resource.data.createdBy == request.auth.uid;
       allow create: if request.auth != null
+                    && request.auth.token.email_verified == true
                     && request.resource.data.createdBy == request.auth.uid;
       allow update, delete: if request.auth != null
+                    && request.auth.token.email_verified == true
                     && resource.data.createdBy == request.auth.uid;
     }
   }

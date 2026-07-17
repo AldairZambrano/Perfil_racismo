@@ -3,6 +3,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendEmailVerification,
   signOut,
 } from "firebase/auth";
 import { auth } from "../lib/firebase";
@@ -23,7 +24,11 @@ export function AuthProvider({ children }) {
 
   const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
 
-  const register = (email, password) => createUserWithEmailAndPassword(auth, email, password);
+  const register = async (email, password) => {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    await sendEmailVerification(cred.user);
+    return cred;
+  };
 
   const logout = () => signOut(auth);
 
